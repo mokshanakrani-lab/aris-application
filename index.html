@@ -178,8 +178,11 @@
     border-radius:9px; padding:9px 14px; width:260px; color:var(--text-faint); font-size:13px;
   }
   .searchbox svg{width:15px;height:15px; flex-shrink:0;}
-  .bell{position:relative; width:36px;height:36px; border-radius:9px; background:#fff; border:1px solid var(--border); display:flex; align-items:center; justify-content:center;}
-  .bell .dot{position:absolute; top:8px; right:9px; width:7px;height:7px;border-radius:50%;background:var(--red);}
+  .searchbox input{border:none; outline:none; background:none; font-size:13px; color:var(--text); width:100%; font-family:inherit;}
+  .searchbox input::placeholder{color:var(--text-faint);}
+  .bell{position:relative; width:36px;height:36px; border-radius:9px; background:#fff; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .bell .dot{position:absolute; top:8px; right:9px; width:7px;height:7px;border-radius:50%;background:var(--red); transition:opacity .15s;}
+  .bell .dot.seen{opacity:0; pointer-events:none;}
   .top-avatar{width:36px;height:36px;border-radius:50%; background:var(--blue); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; cursor:pointer;}
 
   .content{padding:0 30px 36px; flex:1;}
@@ -310,6 +313,11 @@
   body.dark-mode .searchbox{background:var(--card);}
   body.dark-mode .bell{background:var(--card);}
   body.dark-mode .station-select{background:var(--card);}
+  .station-popover{position:fixed; z-index:50; background:var(--card); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow); padding:6px; min-width:180px; display:none;}
+  .station-popover.open{display:block;}
+  .station-popover .sp-item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 10px; border-radius:7px; font-size:13px; font-weight:600; color:var(--navy); cursor:pointer;}
+  .station-popover .sp-item:hover{background:var(--blue-soft);}
+  .station-popover .sp-item svg{color:var(--blue);}
   body.dark-mode .map-zoom{background:var(--card);}
   body.dark-mode .brand-mark{background:#26335e;}
   body.dark-mode .login-badge .icon{background:#26335e;}
@@ -346,6 +354,7 @@
   .dpad button{border:1px solid var(--border); background:#f8f9fc; border-radius:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--navy);}
   .dpad button.center{background:var(--blue); color:#fff; border:none;}
   .dpad button:hover{background:var(--blue-soft);}
+  .dpad button:active{background:var(--blue); color:#fff;}
   .cam-btn{display:flex; flex-direction:column; align-items:center; gap:4px; background:#f8f9fc; border:1px solid var(--border); border-radius:9px; padding:14px 18px; font-size:11.5px; font-weight:700; color:var(--navy); cursor:pointer;}
   .cam-btn small{font-weight:600; color:var(--text-faint); font-size:10.5px;}
 
@@ -427,7 +436,7 @@ function mapBlock(id, height){
     <svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M8 84 L92 12" stroke="#e8b93a" stroke-width="0.8" fill="none"/></svg>
     <div class="robot-pin" style="top:56%; left:38%;">${icoBot(16)}</div>
     <div class="threat-pin" style="top:22%; left:72%;">${icoBell(14)}</div>
-    <div class="map-alert">
+    <div class="map-alert" data-goto="eventlogs">
       <div class="ic">${icoFlag(15)}</div>
       <div class="txt"><b>Suspicious object detected</b><span>Platform 3 — North End · 10:24 AM</span></div>
       <div class="chev">${chev()}</div>
@@ -448,7 +457,7 @@ function robotStatusCard(prefix, narrow){
     <div class="rs-name">ARIS-01</div>
     <div class="rs-mode">
       <div class="ic">${icoBot(18)}</div>
-      <div><b>Autonomous patrol</b><span>Zone A · Platform level</span></div>
+      <div><b id="${prefix}-rs-status">Autonomous patrol</b><span>Zone A · Platform level</span></div>
     </div>
     <div class="rs-metrics">
       <div class="rs-metric"><div class="lbl">${icoBolt()} Battery</div><div class="val" id="${prefix}-batt">78%</div><div class="bar-track" style="width:120px;"><div class="bar-fill" id="${prefix}-batt-bar" style="width:78%;"></div></div></div>
@@ -456,7 +465,7 @@ function robotStatusCard(prefix, narrow){
     </div>
     <div class="rs-progress-lbl"><span>Patrol progress</span><span id="${prefix}-progress-val">64%</span></div>
     <div class="bar-track"><div class="bar-fill" id="${prefix}-progress-bar" style="width:64%;"></div></div>
-    <button class="btn-block">Open robot control ${chev()}</button>
+    <button class="btn-block" data-goto="robotcontrol">Open robot control ${chev()}</button>
   </div>`;
 }
 
@@ -486,7 +495,7 @@ function robotAndAlertsBlock(){
         <div class="attn-eyebrow">NEEDS ATTENTION</div>
         <div class="attn-title">Active alerts <span class="count-pill">3</span></div>
       </div>
-      <button class="viewall">View all ${chev()}</button>
+      <button class="viewall" data-goto="eventlogs">View all ${chev()}</button>
     </div>
     ${alertsList()}
   </div>`;
@@ -498,9 +507,8 @@ const EVENTS = [
   {dot:'red', name:'Narcotics detected', loc:'Platform 1 — Entry', time:'09:12 AM', cat:'threats'},
   {dot:'blue', name:'Robot system check complete', loc:'Platform 1', time:'08:30 AM', cat:'system'},
 ];
-function renderEvents(filter){
+function renderEventRows(rows){
   const body = document.getElementById('event-log-body');
-  const rows = EVENTS.filter(e=> filter==='all' || e.cat===filter);
   body.innerHTML = rows.map(e=>`
     <tr>
       <td><div class="ev-name"><span class="dot ${e.dot}"></span>${e.name}</div></td>
@@ -508,6 +516,9 @@ function renderEvents(filter){
       <td>${e.time}</td>
       <td><span class="pill-status"><span class="dot"></span> Recorded</span></td>
     </tr>`).join('') || '<tr><td colspan="4"><div class="empty-note">No events in this category.</div></td></tr>';
+}
+function renderEvents(filter){
+  renderEventRows(EVENTS.filter(e=> filter==='all' || e.cat===filter));
 }
 
 const ROOT_HTML = `
@@ -586,8 +597,8 @@ const ROOT_HTML = `
         <div class="page-title" id="page-title">Good morning, Arjun</div>
       </div>
       <div class="top-right">
-        <div class="searchbox">${icoSearch()} <span>Search operations…</span></div>
-        <div class="bell">${icoBell()}<span class="dot"></span></div>
+        <div class="searchbox">${icoSearch()} <input type="text" id="global-search" placeholder="Search operations…"></div>
+        <div class="bell" id="bell-btn">${icoBell()}<span class="dot" id="bell-dot"></span></div>
         <div class="top-avatar" id="top-avatar">AS</div>
       </div>
     </div>
@@ -737,10 +748,10 @@ const ROOT_HTML = `
               <div class="mv-head">Movement control <span id="mv-mode-label">Autonomous mode</span></div>
               <div class="mv-body">
                 <div class="dpad">
-                  <span></span><button>${icoArrow('up')}</button><span></span>
-                  <button>${icoArrow('left')}</button><button class="center">${icoBot(16)}</button><button>${icoArrow('right')}</button>
+                  <span></span><button data-dir="up">${icoArrow('up')}</button><span></span>
+                  <button data-dir="left">${icoArrow('left')}</button><button class="center" data-dir="center">${icoBot(16)}</button><button data-dir="right">${icoArrow('right')}</button>
                 </div>
-                <button class="cam-btn">${icoCam(18)} Front camera <small>Live view</small></button>
+                <button class="cam-btn" id="cam-toggle-btn">${icoCam(18)} Front camera <small>Live view</small></button>
               </div>
             </div>
           </div>
@@ -802,7 +813,7 @@ const ROOT_HTML = `
                 <div class="card-eyebrow" style="color:var(--text-dim);">AUDIT TRAIL</div>
                 <div class="card-title">Event logs</div>
               </div>
-              <button class="export-btn">${icoDownload(14)} Export logs</button>
+              <button class="export-btn" id="export-logs-btn">${icoDownload(14)} Export logs</button>
             </div>
           </div>
           <div class="tabs">
@@ -950,6 +961,10 @@ document.querySelectorAll('.nav-item[data-view]').forEach(btn=>{
     const titles = {overview:['Overview',greetingWord() + ', ' + currentUserFirstName], livemap:['Live Map','Live Map'], monitoring:['Monitoring','Monitoring'], robotcontrol:['Robot Control','Robot Control'], sensors:['Sensors','Sensors'], eventlogs:['Event Logs','Event Logs'], settings:['Settings','Settings']};
     document.getElementById('crumb-page').textContent = titles[view][0];
     document.getElementById('page-title').textContent = titles[view][1];
+    if(view === 'overview'){
+      const navBadge = document.getElementById('nav-badge');
+      if(navBadge) navBadge.style.display = 'none';
+    }
   });
 });
 
@@ -973,6 +988,116 @@ themeLight && themeLight.addEventListener('click', ()=>{
 themeDark && themeDark.addEventListener('click', ()=>{
   document.body.classList.add('dark-mode');
   themeDark.classList.add('active'); themeLight.classList.remove('active');
+});
+
+const bellBtn = document.getElementById('bell-btn');
+const bellDot = document.getElementById('bell-dot');
+if(bellDot && ALERTS.length === 0) bellDot.classList.add('seen');
+bellBtn && bellBtn.addEventListener('click', ()=>{
+  bellDot && bellDot.classList.add('seen');
+  const navBadge = document.getElementById('nav-badge');
+  if(navBadge) navBadge.style.display = 'none';
+});
+
+const stationPopover = document.createElement('div');
+stationPopover.className = 'station-popover';
+stationPopover.innerHTML = '<div class="sp-item"><span>Central Station</span>' + icoCheck(14) + '</div>';
+document.body.appendChild(stationPopover);
+document.querySelectorAll('.station-select').forEach(btn=>{
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    const isOpenForThis = stationPopover.classList.contains('open') && stationPopover._forBtn === btn;
+    stationPopover.classList.remove('open');
+    if(isOpenForThis) return;
+    const r = btn.getBoundingClientRect();
+    stationPopover.style.top = (r.bottom + 6) + 'px';
+    stationPopover.style.left = r.left + 'px';
+    stationPopover.style.minWidth = r.width + 'px';
+    stationPopover._forBtn = btn;
+    stationPopover.classList.add('open');
+  });
+});
+document.addEventListener('click', ()=> stationPopover.classList.remove('open'));
+
+const globalSearch = document.getElementById('global-search');
+globalSearch && globalSearch.addEventListener('input', function(){
+  const q = this.value.trim().toLowerCase();
+  if(q){
+    const activeView = document.querySelector('.nav-item[data-view].active');
+    if(!activeView || activeView.dataset.view !== 'eventlogs'){
+      document.querySelector('.nav-item[data-view="eventlogs"]').click();
+    }
+    renderEventRows(EVENTS.filter(e => e.name.toLowerCase().includes(q) || e.loc.toLowerCase().includes(q)));
+  } else {
+    const activeTab = document.querySelector('.tab[data-etab].active');
+    renderEvents(activeTab ? activeTab.dataset.etab : 'all');
+  }
+});
+
+document.querySelectorAll('[data-goto]').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    const target = document.querySelector('.nav-item[data-view="'+el.dataset.goto+'"]');
+    if(target) target.click();
+  });
+});
+
+document.querySelectorAll('.link-btn').forEach(btn=>{
+  const originalHTML = btn.innerHTML;
+  btn.addEventListener('click', ()=>{
+    const card = btn.closest('.card');
+    if(!card) return;
+    if(!document.fullscreenElement){
+      (card.requestFullscreen || card.webkitRequestFullscreen || function(){}).call(card);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+    }
+  });
+  document.addEventListener('fullscreenchange', ()=>{
+    btn.innerHTML = document.fullscreenElement && document.fullscreenElement.contains(btn) ? 'Exit full screen' : originalHTML;
+  });
+});
+
+function setRobotStatus(text){
+  ['ov-rs-status','rc-rs-status'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.textContent = text;
+  });
+}
+document.getElementById('btn-start') && document.getElementById('btn-start').addEventListener('click', ()=>{
+  setRobotStatus('Autonomous patrol');
+});
+document.getElementById('btn-stop') && document.getElementById('btn-stop').addEventListener('click', ()=>{
+  setRobotStatus('Patrol stopped');
+});
+document.getElementById('btn-estop') && document.getElementById('btn-estop').addEventListener('click', ()=>{
+  setRobotStatus('Emergency stop engaged');
+});
+
+document.querySelectorAll('.dpad button[data-dir]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const label = document.getElementById('mv-mode-label');
+    if(!label) return;
+    const prev = label.textContent;
+    label.textContent = 'Moving ' + btn.dataset.dir;
+    setTimeout(()=>{ label.textContent = prev; }, 900);
+  });
+});
+
+const camToggleBtn = document.getElementById('cam-toggle-btn');
+camToggleBtn && camToggleBtn.addEventListener('click', ()=>{
+  const isFront = camToggleBtn.textContent.trim().startsWith('Front');
+  camToggleBtn.innerHTML = icoCam(18) + (isFront ? ' Rear camera <small>Live view</small>' : ' Front camera <small>Live view</small>');
+});
+
+document.getElementById('export-logs-btn') && document.getElementById('export-logs-btn').addEventListener('click', ()=>{
+  const header = 'Event,Location,Time,Category\n';
+  const rows = EVENTS.map(e => [e.name, e.loc, e.time, e.cat].map(v => '"' + v.replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([header + rows], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'aris-event-logs.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
 let tempUnit = 'C';
@@ -1063,6 +1188,8 @@ function initApp(){
   renderEvents('all');
   seedChart();
   drawChart();
+  const navBadge = document.getElementById('nav-badge');
+  if(navBadge) navBadge.style.display = 'none';
   const tt = document.getElementById('tel-time');
   if(tt) tt.textContent = nowStr();
 
